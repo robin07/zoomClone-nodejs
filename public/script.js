@@ -1,16 +1,16 @@
-const socket=io();
+const socket = io();
 
-const videoGrid=document.getElementById('video-grid');
+const videoGrid = document.getElementById('video-grid');
 const myvideo = document.createElement('video');
 myvideo.muted = true;
 
-const addVideoStream = (video, stream) => {
-    video.srcObject = stream;
-    video.addEventListener('loadedmetadata', () => {
-        video.play();
-    })
-    videoGrid.append(video);
-}
+var peer = new Peer(undefined, {
+    path: '/peerjs',
+    host: '/',
+    port: '3030'
+})
+
+
 
 let myVideoStream;
 navigator.mediaDevices.getUserMedia({
@@ -18,15 +18,41 @@ navigator.mediaDevices.getUserMedia({
     audio: true
 }).then(stream => {
     myVideoStream = stream;
-    addVideoStream(myvideo,stream);
+    addVideoStream(myvideo, stream);
+
+    peer.on('call', (call) => {
+        call.answer(stream);
+        const video = document.createElement('video');
+        call.on('stream', (remoteStream) => {
+            addVideoStream(video, remoteStream);
+        })
+    })
+
+    socket.on('user-connected', (userId) => {
+        connectToNewUser(userId, stream);
+    })
 })
 
-socket.emit('join-room',ROOM_ID);
-
-socket.on('user-connected',()=>{
-    connectToNewUser();
+peer.on('open', (id) => {
+    //  console.log(id)
+    socket.emit('join-room', ROOM_ID, id);
 })
 
-const connectToNewUser=()=>{
-    console.log('New user');
+
+
+const connectToNewUser = (id, stream) => {
+    var call = peer.call(id, stream);
+    const video = document.createElement('video');
+    call.on('stream', (remoteStream)=> {
+        // Show stream in some video/canvas element.
+        addVideoStream(video, remoteStream);
+    });
+}
+
+const addVideoStream = (video, stream) => {
+    video.srcObject = stream;
+    video.addEventListener('loadedmetadata', () => {
+        video.play();
+    })
+    videoGrid.append(video);
 }
